@@ -161,11 +161,11 @@ async function api<T>(url: string, encodedDocumentText: string): Promise<T> {
 	});
 }
 
-async function sendTextDocument(textDocument: TextDocument): Promise<void> {
+async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
 	const url = 'http://localhost:2020/post';
 	const documentText = textDocument.getText();
 	const encodedDocumentText = encodeURI(documentText);
-	console.log('sendTextDocument is called');
+	console.log('sendOneTextDocument is called');
 
 	const response = api<Response>(url, encodedDocumentText)
 		.then(({ ok, status }) => {
@@ -178,7 +178,7 @@ async function sendTextDocument(textDocument: TextDocument): Promise<void> {
 }
 
 documents.onDidSave(change => {
-	sendTextDocument(change.document);
+	sendOneTextDocument(change.document);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {

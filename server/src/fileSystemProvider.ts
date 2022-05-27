@@ -209,7 +209,7 @@ export class MemFS implements vscode.FileSystemProvider {
 
     watch(_resource: vscode.Uri): vscode.Disposable {
         // ignore, fires for all changes...
-        return new vscode.Disposable(() => { });
+        return new vscode.Disposable(() => { return; });
     }
 
     private _fireSoon(...events: vscode.FileChangeEvent[]): void {

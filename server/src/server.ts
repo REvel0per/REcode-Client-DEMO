@@ -21,9 +21,7 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
-import FormData = require('form-data');
-import { api } from './api';
-import * as vscode from 'vscode';
+import { getDiagnoticsTest, postFile } from './api';
 
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -141,13 +139,29 @@ documents.onDidChangeContent(change => {
 
 async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
 	const url = 'http://localhost:2020/post';
+	const documentName = String(textDocument.uri.split("/").at(-1));
 	const documentText = textDocument.getText();
 	const encodedDocumentText = encodeURI(documentText);
 	console.log('sendOneTextDocument is called');
 
-	const response = api<Response>(url, encodedDocumentText)
+	const response = postFile<Response>(url, documentName, encodedDocumentText)
 		.then(({ ok, status }) => {
 			console.log(ok, status);
+		})
+		.catch(error => {
+			console.log(error);
+		});
+	// console.log(response);
+}
+
+async function getTextDocumentDiagnostic(): Promise<void> {
+	const url = 'http://localhost:2020/get/test';
+	console.log('getTextDocumentDiagnostic is called');
+
+	const response = getDiagnoticsTest<Response>(url)
+		.then(({ ok, status, body }) => {
+			console.log(ok, status);
+			console.log(body);
 		})
 		.catch(error => {
 			console.log(error);
@@ -155,13 +169,10 @@ async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
 	console.log(response);
 }
 
-async function readWorkSpace():Promise<void> {
-	console.log("readWorkSpace Called");
-}
-
 documents.onDidSave(change => {
 	sendOneTextDocument(change.document);
-	readWorkSpace();
+	console.log(change.document);
+	// getTextDocumentDiagnostic();
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {

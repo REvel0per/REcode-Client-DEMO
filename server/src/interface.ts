@@ -11,7 +11,7 @@ export interface BugInterface {
 
 export interface FileInterface {
 	filename: string
-	bug: BugInterface[]
+	bug: string
 }
 
 export interface DiagnosticsRes {

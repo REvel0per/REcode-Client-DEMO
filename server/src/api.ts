@@ -13,7 +13,7 @@ export async function postFile<T>(url: string, documentName: string, encodedDocu
 		url,
 		{
 			method: "POST",
-			body: body as BodyInit
+			body: body
 		}
 	).then(response => {
 		if (!response.ok) {

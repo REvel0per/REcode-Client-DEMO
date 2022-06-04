@@ -22,6 +22,8 @@ import {
 } from 'vscode-languageserver-textdocument';
 
 import { getDiagnoticsTest, postFile } from './api';
+import { parseDiagnostic } from './diagnostic';
+import { DiagnosticsRes } from './interface';
 
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -138,7 +140,7 @@ documents.onDidChangeContent(change => {
 });
 
 async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/post';
+	const url = 'http://localhost:2020/upload';
 	const documentName = String(textDocument.uri.split("/").at(-1));
 	const documentText = textDocument.getText();
 	const encodedDocumentText = encodeURI(documentText);
@@ -154,7 +156,7 @@ async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
 	// console.log(response);
 }
 
-async function getTextDocumentDiagnostic(): Promise<void> {
+async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<void> {
 	const url = 'http://localhost:2020/get/test';
 	console.log('getTextDocumentDiagnostic is called');
 
@@ -162,17 +164,24 @@ async function getTextDocumentDiagnostic(): Promise<void> {
 		.then(({ ok, status, body }) => {
 			console.log(ok, status);
 			console.log(body);
+			displayDiagnostic(textDocument, body);
 		})
 		.catch(error => {
 			console.log(error);
 		});
-	console.log(response);
+	// console.log(response);
+}
+
+async function displayDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
+	console.log('displayDiagnostic called');
+	const diagnostics: Diagnostic[] = parseDiagnostic(responce);
+	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
 documents.onDidSave(change => {
-	sendOneTextDocument(change.document);
-	console.log(change.document);
-	// getTextDocumentDiagnostic();
+	// sendOneTextDocument(change.document);
+	getTextDocumentDiagnostic(change.document);
+	// displayDiagnostic(change.document, responce);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {

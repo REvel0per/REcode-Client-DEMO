@@ -139,28 +139,31 @@ documents.onDidChangeContent(change => {
 	validateTextDocument(change.document);
 });
 
-async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/upload';
-	const documentName = String(textDocument.uri.split("/").at(-1));
-	const documentText = textDocument.getText();
-	const encodedDocumentText = encodeURI(documentText);
-	console.log('sendOneTextDocument is called');
+// async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
+// 	const url = 'http://localhost:2020/upload';
+// 	const documentName = String(textDocument.uri.split("/").at(-1));
+// 	const documentText = textDocument.getText();
+// 	const encodedDocumentText = encodeURI(documentText);
+// 	console.log('sendOneTextDocument is called');
 
-	const response = postFile<Response>(url, documentName, encodedDocumentText)
-		.then(({ ok, status }) => {
-			console.log(ok, status);
-		})
-		.catch(error => {
-			console.log(error);
-		});
-	// console.log(response);
-}
+// 	const response = postFile<Response>(url, documentName, encodedDocumentText)
+// 		.then(({ ok, status }) => {
+// 			console.log(ok, status);
+// 		})
+// 		.catch(error => {
+// 			console.log(error);
+// 		});
+// 	// console.log(response);
+// }
 
 async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/get/test';
+	const url = 'http://localhost:2020/infer'; // 여기 수정!!!
 	console.log('getTextDocumentDiagnostic is called');
+	const documentName = String(textDocument.uri.split("/").at(-1));
+	const documentText = textDocument.getText();
+	// const encodedDocumentText = encodeURI(documentText);
 
-	const response = getDiagnoticsTest<Response>(url)
+	const response = postFile<Response>(url, documentName, documentText)
 		.then(({ ok, status, body }) => {
 			console.log(ok, status);
 			console.log(body);
@@ -169,7 +172,7 @@ async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<vo
 		.catch(error => {
 			console.log(error);
 		});
-	// console.log(response);
+	console.log(response);
 }
 
 async function displayDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
@@ -179,9 +182,7 @@ async function displayDiagnostic(textDocument: TextDocument, responce: any): Pro
 }
 
 documents.onDidSave(change => {
-	// sendOneTextDocument(change.document);
 	getTextDocumentDiagnostic(change.document);
-	// displayDiagnostic(change.document, responce);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {

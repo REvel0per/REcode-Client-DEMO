@@ -6,7 +6,6 @@ import {
 	createConnection,
 	TextDocuments,
 	Diagnostic,
-	DiagnosticSeverity,
 	ProposedFeatures,
 	InitializeParams,
 	DidChangeConfigurationNotification,
@@ -21,9 +20,8 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
-import { getDiagnoticsTest, postFile } from './api';
-import { parseDiagnostic } from './diagnostic';
-import { DiagnosticsRes } from './interface';
+import { postFile } from './api';
+import { parseDiagnostic, parseLint } from './diagnostic';
 
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -110,7 +108,7 @@ connection.onDidChangeConfiguration(change => {
 	}
 
 	// Revalidate all open text documents
-	documents.all().forEach(validateTextDocument);
+	// documents.all().forEach(validateTextDocument);
 });
 
 function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
@@ -136,7 +134,7 @@ documents.onDidClose(e => {
 // The content of a text document has changed. This event is emitted
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent(change => {
-	validateTextDocument(change.document);
+	getTextDocumentLint(change.document);
 });
 
 // async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
@@ -157,27 +155,42 @@ documents.onDidChangeContent(change => {
 // }
 
 async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/infer'; // 여기 수정!!!
+	const url = 'http://localhost:2020/infer';
 	console.log('getTextDocumentDiagnostic is called');
 	const documentName = String(textDocument.uri.split("/").at(-1));
 	const documentText = textDocument.getText();
-	// const encodedDocumentText = encodeURI(documentText);
 
 	const response = postFile<Response>(url, documentName, documentText)
-		.then(({ ok, status, body }) => {
-			console.log(ok, status);
-			console.log(body);
-			displayDiagnostic(textDocument, body);
-		})
-		.catch(error => {
-			console.log(error);
-		});
-	console.log(response);
+	.then(({ ok, status, body }) => {
+		console.log(ok, status);
+		console.log(body);
+		displayBugDiagnostic(textDocument, body);
+	});
 }
 
-async function displayDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
-	console.log('displayDiagnostic called');
-	const diagnostics: Diagnostic[] = parseDiagnostic(responce);
+async function getTextDocumentLint(textDocument: TextDocument): Promise<void> {
+	const url = 'http://localhost:2020/norm';
+	console.log('getTextDocumentLint is called');
+	const documentName = String(textDocument.uri.split("/").at(-1));
+	const documentText = textDocument.getText();
+
+	const response = await postFile<Response>(url, documentName, documentText)
+	.then(({ ok, status, body }) => {
+		console.log(ok, status);
+		console.log(body);
+		displayLintDiagnostic(textDocument, body);
+	});
+}
+
+async function displayBugDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
+	console.log('displayBugDiagnostic called');
+	const diagnostics: Diagnostic[] = parseDiagnostic(textDocument, responce);
+	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+}
+
+async function displayLintDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
+	console.log('displayLintDiagnostic called');
+	const diagnostics: Diagnostic[] = parseLint(textDocument, responce);
 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
@@ -185,52 +198,52 @@ documents.onDidSave(change => {
 	getTextDocumentDiagnostic(change.document);
 });
 
-async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-	// In this simple example we get the settings for every validate run.
-	const settings = await getDocumentSettings(textDocument.uri);
-	console.log('validateTextDocument called');
-	// The validator creates diagnostics for all uppercase words length 2 and more
-	const text = textDocument.getText();
-	const pattern = /\b[A-Z]{2,}\b/g;
-	let m: RegExpExecArray | null;
+// async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+// 	// In this simple example we get the settings for every validate run.
+// 	const settings = await getDocumentSettings(textDocument.uri);
+// 	console.log('validateTextDocument called');
+// 	// The validator creates diagnostics for all uppercase words length 2 and more
+// 	const text = textDocument.getText();
+// 	const pattern = /\b[A-Z]{2,}\b/g;
+// 	let m: RegExpExecArray | null;
 
-	let problems = 0;
-	const diagnostics: Diagnostic[] = [];
-	while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
-		problems++;
-		const diagnostic: Diagnostic = {
-			severity: DiagnosticSeverity.Warning,
-			range: {
-				start: textDocument.positionAt(m.index),
-				end: textDocument.positionAt(m.index + m[0].length)
-			},
-			message: `${m[0]} is all uppercase.`,
-			source: 'ex'
-		};
-		if (hasDiagnosticRelatedInformationCapability) {
-			diagnostic.relatedInformation = [
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Spelling matters'
-				},
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Particularly for names'
-				}
-			];
-		}
-		diagnostics.push(diagnostic);
-	}
+// 	let problems = 0;
+// 	const diagnostics: Diagnostic[] = [];
+// 	while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
+// 		problems++;
+// 		const diagnostic: Diagnostic = {
+// 			severity: DiagnosticSeverity.Warning,
+// 			range: {
+// 				start: textDocument.positionAt(m.index),
+// 				end: textDocument.positionAt(m.index + m[0].length)
+// 			},
+// 			message: `${m[0]} is all uppercase.`,
+// 			source: 'ex'
+// 		};
+// 		if (hasDiagnosticRelatedInformationCapability) {
+// 			diagnostic.relatedInformation = [
+// 				{
+// 					location: {
+// 						uri: textDocument.uri,
+// 						range: Object.assign({}, diagnostic.range)
+// 					},
+// 					message: 'Spelling matters'
+// 				},
+// 				{
+// 					location: {
+// 						uri: textDocument.uri,
+// 						range: Object.assign({}, diagnostic.range)
+// 					},
+// 					message: 'Particularly for names'
+// 				}
+// 			];
+// 		}
+// 		diagnostics.push(diagnostic);
+// 	}
 
-	// Send the computed diagnostics to VSCode.
-	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-}
+// 	// Send the computed diagnostics to VSCode.
+// 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+// }
 
 connection.onDidChangeWatchedFiles(_change => {
 	// Monitored files have change in VSCode

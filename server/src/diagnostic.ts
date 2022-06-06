@@ -1,38 +1,37 @@
-import { assert } from 'console';
-import { Diagnostic, DiagnosticSeverity } from 'vscode-languageserver';
-import { BugInterface, DiagnosticsRes } from './interface';
+import { TextDocument } from 'vscode-languageserver-textdocument';
+import { Diagnostic } from 'vscode-languageserver';
+import { bugDiagnosticProducer } from './bug';
+import { BugInterface, DiagnosticsRes, LintInterface, LintRes } from './interface';
+import { lintDiagnosticProducer } from './lint';
 
-export function parseDiagnostic(responce: DiagnosticsRes): Diagnostic[] {
+export function parseDiagnostic(textdocument: TextDocument, responce: DiagnosticsRes): Diagnostic[] {
+	console.log('parseDiagnostic called');
 	const diagnostics: Diagnostic[] = [];
 	const files = responce.files;
 	files.forEach(file => {
-		const name: string = file.filename;
-		const bugs = JSON.parse(file.bug);
-		console.log(bugs);
+		const bugs = file.bug;
 		bugs.forEach((bug: BugInterface) => {
-			const varName: string = bug.qualifier.split('`')[1];
-			const varLength = varName ? varName.length : 0;
-			const diagnostic: Diagnostic = {
-				range: {
-					start: { 
-						line: bug.line-1,
-						character: bug.column
-					},
-					end: { 
-						line: bug.line-1,
-						character: bug.column+varLength
-					}
-				},
-				message: `[${bug.bug_type_hum}] ` + bug.qualifier
-			};
-			if (bug.severity === 'ERROR') {
-				diagnostic.severity = DiagnosticSeverity.Error;
-			} else if (bug.severity === 'WARNING') {
-				diagnostic.severity = DiagnosticSeverity.Warning;
-			}
-
-			diagnostics.push(diagnostic);
+			diagnostics.push(bugDiagnosticProducer(bug));
+		});
+		const lints = file.lint;
+		lints.forEach((lint: LintInterface) => {
+			diagnostics.push(lintDiagnosticProducer(textdocument, lint));
 		});
 	});
+	console.log(diagnostics);
+	return diagnostics; 
+}
+
+export function parseLint(textdocument: TextDocument, responce: LintRes): Diagnostic[] {
+	console.log('parseLint called');
+	const diagnostics: Diagnostic[] = [];
+	const files = responce.files;
+	files.forEach(file => {
+		const lints = file.lint;
+		lints.forEach((lint: LintInterface) => {
+			diagnostics.push(lintDiagnosticProducer(textdocument, lint));
+		});
+	});
+	console.log(diagnostics);
 	return diagnostics; 
 }

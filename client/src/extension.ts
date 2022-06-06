@@ -15,7 +15,7 @@ import {
 
 let client: LanguageClient;
 
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
 	// The server is implemented in node
 	const serverModule = context.asAbsolutePath(
 		path.join('server', 'out', 'server.js')
@@ -57,7 +57,15 @@ export function activate(context: ExtensionContext) {
 	);
 
 	// Start the client. This will also launch the server
-	client.start();
+	await client.start();
+
+	// commands.registerCommand('recode.Infer.invoked', () => {
+	// 	void commands.executeCommand('recode.Infer').then(value => {
+	// 		console.log(value);
+	// 		window.showWarningMessage('Infer called');
+	// 	});
+	// 	window.showWarningMessage('Infer called');
+	// });
 }
 
 export function deactivate(): Thenable<void> | undefined {

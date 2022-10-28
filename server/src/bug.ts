@@ -30,7 +30,6 @@ function stackVarAddrEsc(bug: BugInterface) {
 }
 
 export function bugDiagnosticProducer(bug: BugInterface) {
-	console.log('bugDiagnosticProducer called');
 	let varLength = 1;
 	if (bug.bug_type === 'NULL_DEREFERENCE') {
 		varLength = nullptrDeref(bug)+1;

@@ -20,8 +20,9 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
-import { postFile } from './api';
-import { parseDiagnostic, parseLint } from './diagnostic';
+import { postFile, postProject } from './api';
+import { parseDiagnostic } from './diagnostic';
+
 
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -111,21 +112,6 @@ connection.onDidChangeConfiguration(change => {
 	// documents.all().forEach(validateTextDocument);
 });
 
-function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
-	if (!hasConfigurationCapability) {
-		return Promise.resolve(globalSettings);
-	}
-	let result = documentSettings.get(resource);
-	if (!result) {
-		result = connection.workspace.getConfiguration({
-			scopeUri: resource,
-			section: 'languageServerExample'
-		});
-		documentSettings.set(resource, result);
-	}
-	return result;
-}
-
 // Only keep settings for open documents
 documents.onDidClose(e => {
 	documentSettings.delete(e.document.uri);
@@ -134,65 +120,78 @@ documents.onDidClose(e => {
 // The content of a text document has changed. This event is emitted
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent(change => {
-	getTextDocumentLint(change.document);
+	// getTextDocumentLint(change.document);
 });
 
-// async function sendOneTextDocument(textDocument: TextDocument): Promise<void> {
-// 	const url = 'http://localhost:2020/upload';
+async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<void> {
+	const start = new Date();
+	console.log('getTextDocumentDiagnostic is called');
+	const uri = textDocument.uri;
+	const fileName = uri.split('/').pop();
+	const workspacePath = uri.split("/").slice(0, -1).join("/").replace("file://", "");
+	const workspaceName = String(workspacePath.split("/").at(-1));
+	
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const execSync = require('child_process').execSync;
+	const zipCommand = `cd ${workspacePath} && zip -r ${workspaceName}.zip ./*`;
+	execSync(zipCommand);
+	const zipFilePath = `${workspacePath}/${workspaceName}.zip`;
+	
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const fs = require('fs');
+	const zipFile = fs.readFileSync(zipFilePath, 'binary');
+	const buffer = Buffer.from(zipFile, 'binary');
+	
+	const end = new Date();
+	execSync(`echo "zip time: ${end.getTime() - start.getTime()}" >> ${workspacePath}/log/${fileName}.txt`);
+	console.log('zip time: %d mil-sec', end.getTime() - start.getTime());
+	
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const WebSocket = require('ws');
+	const ws = new WebSocket('ws://localhost:2020');
+	ws.onopen = function () {
+		console.log('connected');
+		ws.send(buffer);
+	};
+	ws.onmessage = function (event: any) {
+		const start = new Date();
+		// Receive JSON data from server
+		const data = JSON.parse(event.data);
+		const files = data.files;
+		files.forEach((file: any) => {
+			const filePath = `${workspacePath}/${file.filename}`;
+			const diagnostics: Diagnostic[] = parseDiagnostic(file.bugs);
+			connection.sendDiagnostics({ uri: filePath, diagnostics });
+		});
+		const end = new Date();
+		execSync(`echo "visualization time: ${end.getTime() - start.getTime()}" >> ${workspacePath}/log/${fileName}.txt`);
+		console.log('visualization time: %d mil-sec', end.getTime() - start.getTime());
+	};
+	ws.onclose = function (event: any) {
+		console.log('disconnected');
+	};
+	ws.onerror = function (error: any) {
+		console.log(error);
+	};
+}
+
+// async function getTextDocumentLint(textDocument: TextDocument): Promise<void> {
+// 	const url = 'http://localhost:2020/norm';
+// 	console.log('getTextDocumentLint is called');
 // 	const documentName = String(textDocument.uri.split("/").at(-1));
 // 	const documentText = textDocument.getText();
-// 	const encodedDocumentText = encodeURI(documentText);
-// 	console.log('sendOneTextDocument is called');
 
-// 	const response = postFile<Response>(url, documentName, encodedDocumentText)
-// 		.then(({ ok, status }) => {
-// 			console.log(ok, status);
-// 		})
-// 		.catch(error => {
-// 			console.log(error);
-// 		});
-// 	// console.log(response);
+// 	const response = await postFile<Response>(url, documentName, documentText)
+// 	.then(({ ok, status, body }) => {
+// 		displayLintDiagnostic(textDocument, body);
+// 	});
 // }
 
-async function getTextDocumentDiagnostic(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/infer';
-	console.log('getTextDocumentDiagnostic is called');
-	const documentName = String(textDocument.uri.split("/").at(-1));
-	const documentText = textDocument.getText();
-
-	const response = postFile<Response>(url, documentName, documentText)
-	.then(({ ok, status, body }) => {
-		console.log(ok, status);
-		console.log(body);
-		displayBugDiagnostic(textDocument, body);
-	});
-}
-
-async function getTextDocumentLint(textDocument: TextDocument): Promise<void> {
-	const url = 'http://localhost:2020/norm';
-	console.log('getTextDocumentLint is called');
-	const documentName = String(textDocument.uri.split("/").at(-1));
-	const documentText = textDocument.getText();
-
-	const response = await postFile<Response>(url, documentName, documentText)
-	.then(({ ok, status, body }) => {
-		console.log(ok, status);
-		console.log(body);
-		displayLintDiagnostic(textDocument, body);
-	});
-}
-
-async function displayBugDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
-	console.log('displayBugDiagnostic called');
-	const diagnostics: Diagnostic[] = parseDiagnostic(textDocument, responce);
-	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-}
-
-async function displayLintDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
-	console.log('displayLintDiagnostic called');
-	const diagnostics: Diagnostic[] = parseLint(textDocument, responce);
-	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-}
+// async function displayLintDiagnostic(textDocument: TextDocument, responce: any): Promise<void> {
+// 	console.log('displayLintDiagnostic called');
+// 	const diagnostics: Diagnostic[] = parseLint(textDocument, responce);
+// 	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+// }
 
 documents.onDidSave(change => {
 	getTextDocumentDiagnostic(change.document);
